@@ -1,33 +1,28 @@
+
+from sklearn.utils import shuffle
 import pandas as pd
 import scipy.stats as stats
 import numpy as np
+import matplotlib as plt
 
 data = pd.read_parquet("new.parquet")
-
-
-# ============= objetivos mais jogados por mapa =============
-#
-# objective_per_map = data[["mapname", "objectivelocation", "endroundreason"]]
-# objective_per_map = objective_per_map.groupby(["mapname", "objectivelocation"]).count()
-# print(objective_per_map)
-#
 
 # ============= mapa ser mais defesa ou ataque (winrole) =============
 
 
+
 collum = np.zeros(data["mapname"].unique().size)
-attacker_win_per_map = pd.DataFrame(
-    {"percentage": collum}, index=data["mapname"].unique()
-)
-for map in attacker_win_per_map.index:
-    map_info = data.query("mapname == '" + (str)(map) + "'")
+attacker_win_per_map = pd.DataFrame(columns=["map", "percentage"])
+
+for map in data["mapname"].unique():
+    map_info = data.query("mapname == '" + (str)(map) + "'")["winrole"]
     values = np.zeros(1000)
     for i in range(1000):
-        map_info = map_info.sample(frac=1)
-        sample = map_info[:100]
-        sample = sample.query("winrole == 'Attacker'")["winrole"]
-        values[i] = sample.size / 100
-
+        sample = shuffle(map_info)[:30]
+        attacker_win = sample.value_counts()["Attacker"]
+        values[i] = attacker_win / 30
+        attacker_win_per_map.loc[len(attacker_win_per_map)] = [map, values[i]]
+    
     print("Map: " + map)
     print(
         "CI: "
@@ -42,24 +37,19 @@ for map in attacker_win_per_map.index:
     )
     print("")
 
+for map in attacker_win_per_map["map"].unique():
+    attacker_win_per_map.query("map == '" + map + "'").hist(column="percentage", by="map", grid=False)
+    
+    
+## Influencia do Mapa no lado vencedor
 
-#
-# winrole_per_map = data[["mapname", "winrole"]]
-# total_count = winrole_per_map.groupby("mapname").count()
-# defender_wins = (
-#     winrole_per_map.query("winrole == 'Defender'").groupby("mapname").count()
-# )
-# attacker_wins = (
-#     winrole_per_map.query("winrole == 'Attacker'").groupby("mapname").count()
-# )
-# print(defender_wins.head())
-# print(attacker_wins.head())
-#
-#
-# # ============= motivos por vitoria no mapa (duracao do round) =============
-#
-#
-# reason_victory = data[["mapname", "endroundreason", "roundduration"]]
-# reason_victory = reason_victory.groupby(["mapname", "endroundreason"]).mean()
-#
-# print(reason_victory)
+
+#  Idealmente, os atacantes deveriam vencer 50% das vezes. Mapas que não cumprem essa média significam que eles favorecem um lado acima do outro.
+
+#  Para verificar os mapas que favorecem um lado, usamos o teste da permutação para verificar em média quantas vitórias os atacantes tiveram por mapa.
+
+#  O intervalo de confiança calculado nos garante que se O valor de 50% estiver no IC, então o mapa é equilibrado (não favorece um lado).
+
+#- Atacantes Favorecidos: COASTLINE, HOUSE, FAVELAS, CHALET
+#- Equilibrados: CLUB_HOUSE, YACHT, BORDER, SKYSCRAPER, BARTLETT_U, KAFE_DOSTOYEVSKY
+#- Defensores Favorecidos: PLANE, KANAL, HEREFORD_BASE, CONSULATE, OREGON, BANK, 
